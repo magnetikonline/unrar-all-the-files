@@ -13,39 +13,44 @@ class UnrarAllTheFiles {
 
 	public function execute(array $argv) {
 
-		// fetch options and validate given dirs - exit on error
-		if (($optionList = $this->getOptions($argv)) === false) return;
-		if (!$this->validateDirs($optionList)) return;
+		// fetch command line options and validate given dirs - exit on error
+		if (
+			(($optionList = $this->getOptions($argv)) === false) ||
+			(!$this->validateDirs($optionList))
+		) exit(1);
 
 		// work over source dir recursively
-		$this->workSourceDir($optionList);
+		$extractFileCount = $this->workSourceDir($optionList);
 
 		// all done
-		$this->writeLine('All done!');
+		$this->writeLine(sprintf(
+			self::LE . 'All done - %d file%s extracted',
+			$extractFileCount,
+			($extractFileCount > 1) ? 's' : ''
+		));
+
+		exit(0);
 	}
 
-	private function buildTargetExtractDir($singleRarFileSet,$sourceDir,$targetDir,$fileDirPart) {
+	private function buildTargetExtractDir($sourceDir,$targetDir,$singleRarFileSet,$baseRarName) {
 
-		// cut source dir off beginning of $fileDirPart
-		$sourceDirLen = strlen($sourceDir);
-		$fileDirPart = (substr($fileDirPart,0,$sourceDirLen) == $sourceDir)
-			? substr($fileDirPart,$sourceDirLen)
-			: $fileDirPart;
+		// remove $sourceDir from beginning of $baseRarName
+		$baseRarName = $this->truncatePrefix($baseRarName,$sourceDir);
 
-		// ensure generated extract dir does not exist on disk
-		if ($singleRarFileSet) $fileDirPart = dirname($fileDirPart);
-		if (!is_dir($extractDir = $targetDir . $fileDirPart)) return $extractDir;
+		// check generated extract dir does not exist on disk
+		if ($singleRarFileSet) $baseRarName = dirname($baseRarName);
+		if (!is_dir($extractDir = $targetDir . $baseRarName)) return $extractDir;
 
-		// extract dir does exist, keep adding digits to suffix until unique on disk
+		// ...extract dir does exist, keep adding digits to suffix until unique
 		$seqCount = 1;
 		while (true) {
-			$extractDir = sprintf('%s%s-%02d',$targetDir,$fileDirPart,$seqCount);
+			$extractDir = sprintf('%s%s-%02d',$targetDir,$baseRarName,$seqCount);
 			if (!is_dir($extractDir)) return $extractDir;
 			$seqCount++;
 		}
 	}
 
-	private function unrarFileSet(array $optionList,$singleRarFileSet,$groupBaseDir,array $rarFileSetList) {
+	private function unrarFileSet(array $optionList,$singleRarFileSet,$baseRarName,array $rarFileSetList) {
 
 		// determine the first rar file in set
 		$firstRarFile = false;
@@ -71,11 +76,15 @@ class UnrarAllTheFiles {
 
 		// have now determined the first rar file in set, build target extract dir
 		$targetExtractDir = $this->buildTargetExtractDir(
-			$singleRarFileSet,
-			$optionList['sourceDir'],$optionList['targetDir'],$groupBaseDir
+			$optionList['sourceDir'],$optionList['targetDir'],
+			$singleRarFileSet,$baseRarName
 		);
 
-		$this->writeLine($firstRarFile . ' => ' . $targetExtractDir . self::LE);
+		// display source rar file and target extract path
+		$this->writeLine(
+			$this->truncatePrefix($firstRarFile,$optionList['sourceDir']) . ' => ' .
+			$targetExtractDir . (($optionList['verbose']) ? self::LE : '')
+		);
 
 		if (!$optionList['dryRun']) {
 			// create target dir and unrar archive
@@ -89,14 +98,14 @@ class UnrarAllTheFiles {
 		}
 	}
 
-	private function getBaseRarFileName($filename) {
+	private function getBaseRarName($filename) {
 
 		if (!preg_match(self::RAR_FILEEXT,$filename)) {
 			// not a rar file - discard
 			return false;
 		}
 
-		// strip off file ext and possible '.partXXX' bit
+		// strip off file ext and possible '.partXXX'
 		return preg_replace([self::RAR_FILEEXT,self::RAR_PART],'',$filename);
 	}
 
@@ -106,18 +115,20 @@ class UnrarAllTheFiles {
 		$groupedFileList = [];
 		foreach ($fileList as $fileItem) {
 			// if not a rar file, skip
-			if (($baseFileItem = $this->getBaseRarFileName($fileItem)) === false) continue;
+			if (($baseRarName = $this->getBaseRarName($fileItem)) === false) continue;
 
-			if (!isset($groupedFileList[$baseFileItem])) $groupedFileList[$baseFileItem] = [];
-			$groupedFileList[$baseFileItem][] = $fileItem;
+			// add rar file to $groupedFileList
+			if (!isset($groupedFileList[$baseRarName])) $groupedFileList[$baseRarName] = [];
+			$groupedFileList[$baseRarName][] = $fileItem;
 		}
 
 		return $groupedFileList;
 	}
 
-	private function workSourceDir(array $optionList,$readDir = false) {
+	private function workSourceDir(array $optionList,$parentDir = false) {
 
-		$baseDir = ($readDir === false) ? $optionList['sourceDir'] : $readDir;
+		$extractFileCount = 0;
+		$baseDir = ($parentDir === false) ? $optionList['sourceDir'] : $parentDir;
 		$handle = opendir($baseDir);
 
 		$fileList = [];
@@ -128,7 +139,7 @@ class UnrarAllTheFiles {
 
 			// if dir found call again recursively
 			if (is_dir($fileItem)) {
-				$this->workSourceDir($optionList,$fileItem);
+				$extractFileCount += $this->workSourceDir($optionList,$fileItem);
 				continue;
 			}
 
@@ -140,19 +151,23 @@ class UnrarAllTheFiles {
 		if (!$fileList) return;
 
 		// process file list, looking for rar sets
-		$groupedFileList = $this->getGroupedFileList($fileList);
-		if (!$groupedFileList) return;
+		if (!($groupedFileList = $this->getGroupedFileList($fileList))) return;
 
-		// if only a single rar file set found, dont extract into unique sub dirs (no need)
+		// if only a single rar file set found, dont extract into individual sub dirs
 		$singleRarFileSet = (sizeof($groupedFileList) == 1);
 
 		// now work over grouped rar file list sets
-		foreach ($groupedFileList as $groupBaseDirItem => $rarFileSetList) {
+		foreach ($groupedFileList as $baseRarName => $rarFileSetList) {
 			$this->unrarFileSet(
 				$optionList,$singleRarFileSet,
-				$groupBaseDirItem,$rarFileSetList
+				$baseRarName,$rarFileSetList
 			);
+
+			$extractFileCount++;
 		}
+
+		// return total extracted file count
+		return $extractFileCount;
 	}
 
 	private function validateDirs(array $optionList) {
@@ -199,7 +214,7 @@ class UnrarAllTheFiles {
 
 		// return options
 		return [
-			'sourceDir' => (isset($optionList['s'])) ? rtrim($optionList['s'],'/') : __DIR__,
+			'sourceDir' => rtrim((isset($optionList['s'])) ? $optionList['s'] : __DIR__,'/'),
 			'targetDir' => rtrim($optionList['t'],'/'),
 			'verbose' => isset($optionList['v']),
 			'dryRun' => isset($optionList['dry-run'])
@@ -209,6 +224,14 @@ class UnrarAllTheFiles {
 	private function writeLine($text,$isError = false) {
 
 		echo((($isError) ? 'Error: ' : '') . $text . self::LE);
+	}
+
+	private function truncatePrefix($val,$truncate) {
+
+		$len = strlen($truncate);
+		return (substr($val,0,$len) == $truncate)
+			? substr($val,$len)
+			: $val;
 	}
 }
 
