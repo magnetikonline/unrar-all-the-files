@@ -20,82 +20,146 @@ class UnrarAllTheFiles {
 		) exit(1);
 
 		// work over source dir recursively
-		$extractFileCount = $this->workSourceDir($optionList);
+		list($extractArchiveCount,$extractErrorList) = $this->workSourceDir($optionList);
 
 		// all done
-		$this->writeLine(sprintf(
-			self::LE . 'All done - %d file%s extracted',
-			$extractFileCount,
-			($extractFileCount > 1) ? 's' : ''
-		));
-
-		exit(0);
+		$this->displayReport($extractArchiveCount,$extractErrorList);
+		exit(($extractErrorList) ? 1 : 0);
 	}
 
-	private function buildTargetExtractDir($sourceDir,$targetDir,$singleRarFileSet,$baseRarName) {
+	private function getUnrarErrorMessage($returnCode) {
 
-		// remove $sourceDir from beginning of $baseRarName
-		$baseRarName = $this->truncatePrefix($baseRarName,$sourceDir);
+		$errorMessageList = [
+			1	=> 'Non fatal error(s) occurred',
+			2	=> 'A fatal error occurred',
+			3	=> 'A CRC error occurred when unpacking',
+			4	=> 'Attempt to modify an archive previously locked by the \'k\' command',
+			5	=> 'Write to disk error',
+			6	=> 'Open file error',
+			7	=> 'Command line option error',
+			8	=> 'Not enough memory for operation',
+			9	=> 'Create file error',
+			10	=> 'You need to start extraction from a previous volume to unpack',
+			255 => 'User stopped the process'
+		];
+
+		return (isset($errorMessageList[$returnCode]))
+			? $errorMessageList[$returnCode]
+			: 'Unknown error code: ' . $returnCode;
+	}
+
+	private function displayReport($extractArchiveCount,array $extractErrorList) {
+
+		// processed archive count
+		$summaryText = sprintf(
+			'All done - %d archive%s processed',
+			$extractArchiveCount,
+			($extractArchiveCount != 1) ? 's' : ''
+		);
+
+		if ($extractErrorList) {
+			// display error count
+			$summaryText .= sprintf(
+				', %d error%s',
+				count($extractErrorList),
+				(count($extractErrorList) > 1) ? 's' : ''
+			);
+		}
+
+		$this->writeLine(
+			self::LE . str_repeat('=',strlen($summaryText)) . self::LE .
+			$summaryText
+		);
+
+		if ($extractErrorList) {
+			// display listing of archive errors
+			$this->writeLine(self::LE . 'Archive errors encountered:');
+			foreach ($extractErrorList as $errorItem) {
+				list($rarFile,$errorCode) = $errorItem;
+				$this->writeLine($rarFile . ' => ' . $this->getUnrarErrorMessage($errorCode));
+			}
+
+			$this->writeLine();
+		}
+	}
+
+	private function buildTargetExtractDir($targetDir,$targetDirSub,$singleRarFileSet) {
 
 		// check generated extract dir does not exist on disk
-		if ($singleRarFileSet) $baseRarName = dirname($baseRarName);
-		if (!is_dir($extractDir = $targetDir . $baseRarName)) return $extractDir;
+		if ($singleRarFileSet) {
+			// if only a single rar file set in current work dir remove final path from target dir - but only if more than one sub-path
+			$targetDirSubParent = dirname($targetDirSub);
+			if ($targetDirSubParent != '/') $targetDirSub = $targetDirSubParent;
+		}
+
+		if (!is_dir($extractDir = $targetDir . $targetDirSub)) return $extractDir;
 
 		// ...extract dir does exist, keep adding digits to suffix until unique
-		$seqCount = 1;
+		$retryCount = 1;
 		while (true) {
-			$extractDir = sprintf('%s%s-%02d',$targetDir,$baseRarName,$seqCount);
+			$extractDir = sprintf('%s%s-%02d',$targetDir,$targetDirSub,$retryCount);
 			if (!is_dir($extractDir)) return $extractDir;
-			$seqCount++;
+			$retryCount++;
 		}
 	}
 
-	private function unrarFileSet(array $optionList,$singleRarFileSet,$baseRarName,array $rarFileSetList) {
-
-		// determine the first rar file in set
-		$firstRarFile = false;
-		$rarFilenameCount = 0;
-		foreach ($rarFileSetList as $fileSetItem) {
-			if (substr($fileSetItem,-4) == '.rar') {
-				if ($rarFilenameCount > 0) {
-					// more than one '.rar' file found
-					$firstRarFile = false;
-					break;
-				}
-
-				$rarFilenameCount++;
-				$firstRarFile = $fileSetItem;
-			}
-		}
-
-		if ($firstRarFile === false) {
-			// can't find a single .rar file so order filelist - the first sorted item will be our starting archive
-			sort($rarFileSetList,SORT_STRING);
-			$firstRarFile = $rarFileSetList[0];
-		}
+	private function unrarArchive(array $optionList,$rarFile,$baseRarName,$singleRarFileSet) {
 
 		// have now determined the first rar file in set, build target extract dir
 		$targetExtractDir = $this->buildTargetExtractDir(
-			$optionList['sourceDir'],$optionList['targetDir'],
-			$singleRarFileSet,$baseRarName
+			$optionList['targetDir'],
+			$this->truncatePrefix($baseRarName,$optionList['sourceDir']),
+			$singleRarFileSet
 		);
 
 		// display source rar file and target extract path
 		$this->writeLine(
-			$this->truncatePrefix($firstRarFile,$optionList['sourceDir']) . ' => ' .
+			$this->truncatePrefix($rarFile,$optionList['sourceDir']) . ' => ' .
 			$targetExtractDir . (($optionList['verbose']) ? self::LE : '')
 		);
 
-		if (!$optionList['dryRun']) {
-			// create target dir and unrar archive
-			mkdir($targetExtractDir,0777,true);
-			system(sprintf(
+		// if dry run, return success unrar status code
+		if ($optionList['dryRun']) return 0;
+
+		// create target dir and unrar archive
+		mkdir($targetExtractDir,0777,true);
+		system(
+			sprintf(
 				'unrar e %s"%s" "%s"',
 				($optionList['verbose']) ? '' : '-inul ',
-				$firstRarFile,
+				$rarFile,
 				$targetExtractDir
-			));
+			),
+			$unrarReturnCode
+		);
+
+		return $unrarReturnCode;
+	}
+
+	private function getStartingRarFileFromSet(array $rarFileSetList) {
+
+		$startingFile = false;
+		$fileCount = 0;
+		foreach ($rarFileSetList as $item) {
+			if (substr($item,-4) == '.rar') {
+				if ($fileCount > 0) {
+					// more than one '.rar' file found
+					$startingFile = false;
+					break;
+				}
+
+				$fileCount++;
+				$startingFile = $item;
+			}
 		}
+
+		if ($startingFile === false) {
+			// not a single .rar file in set - order filelist - first item will be starting file
+			sort($rarFileSetList,SORT_STRING);
+			$startingFile = $rarFileSetList[0];
+		}
+
+		return $startingFile;
 	}
 
 	private function getBaseRarName($filename) {
@@ -127,11 +191,13 @@ class UnrarAllTheFiles {
 
 	private function workSourceDir(array $optionList,$parentDir = false) {
 
-		$extractFileCount = 0;
+		$extractArchiveCount = 0;
+		$extractErrorList = [];
+
 		$baseDir = ($parentDir === false) ? $optionList['sourceDir'] : $parentDir;
 		$handle = opendir($baseDir);
-
 		$fileList = [];
+
 		while (($fileItem = readdir($handle)) !== false) {
 			// skip '.' and '..'
 			if (($fileItem == '.') || ($fileItem == '..')) continue;
@@ -139,7 +205,10 @@ class UnrarAllTheFiles {
 
 			// if dir found call again recursively
 			if (is_dir($fileItem)) {
-				$extractFileCount += $this->workSourceDir($optionList,$fileItem);
+				list($archiveCount,$errorList) = $this->workSourceDir($optionList,$fileItem);
+				$extractArchiveCount += $archiveCount;
+				$extractErrorList = array_merge($extractErrorList,$errorList);
+
 				continue;
 			}
 
@@ -148,26 +217,35 @@ class UnrarAllTheFiles {
 		}
 
 		closedir($handle);
-		if (!$fileList) return;
+		if (!$fileList) return [$extractArchiveCount,$extractErrorList];
 
 		// process file list, looking for rar sets
-		if (!($groupedFileList = $this->getGroupedFileList($fileList))) return;
+		if (!($groupedFileList = $this->getGroupedFileList($fileList))) return [$extractArchiveCount,$extractErrorList];
 
 		// if only a single rar file set found, dont extract into individual sub dirs
 		$singleRarFileSet = (sizeof($groupedFileList) == 1);
 
 		// now work over grouped rar file list sets
 		foreach ($groupedFileList as $baseRarName => $rarFileSetList) {
-			$this->unrarFileSet(
-				$optionList,$singleRarFileSet,
-				$baseRarName,$rarFileSetList
-			);
+			// determine starting rar file from set and unrar archive
+			$startingRarFile = $this->getStartingRarFileFromSet($rarFileSetList);
+			$unrarReturnCode = $this->unrarArchive($optionList,$startingRarFile,$baseRarName,$singleRarFileSet);
 
-			$extractFileCount++;
+			if ($unrarReturnCode == 0) {
+				// success
+				$extractArchiveCount++;
+
+			} else {
+				// error - store the starting rar file and error code
+				$extractErrorList[] = [
+					$this->truncatePrefix($startingRarFile,$optionList['sourceDir']),
+					$unrarReturnCode
+				];
+			}
 		}
 
-		// return total extracted file count
-		return $extractFileCount;
+		// total extracted file count & error list
+		return [$extractArchiveCount,$extractErrorList];
 	}
 
 	private function validateDirs(array $optionList) {
@@ -196,11 +274,11 @@ class UnrarAllTheFiles {
 
 		$optionList = getopt('s:t:v',['dry-run']);
 
-		// are all required options given?
+		// required options given?
 		if (!isset($optionList['t'])) {
 			// no - display usage
 			$this->writeLine(
-				'Usage:  php ' . $argv[0] . ' -t[dir] -s[dir] -v --dry-run' . self::LE . self::LE .
+				'Usage: php ' . $argv[0] . ' -t[dir] -s[dir] -v --dry-run' . self::LE . self::LE .
 				'<Required>' . self::LE .
 				'  -t[dir]       Target directory for unrared files' . self::LE . self::LE .
 				'<Optional>' . self::LE .
@@ -221,7 +299,7 @@ class UnrarAllTheFiles {
 		];
 	}
 
-	private function writeLine($text,$isError = false) {
+	private function writeLine($text = '',$isError = false) {
 
 		echo((($isError) ? 'Error: ' : '') . $text . self::LE);
 	}
