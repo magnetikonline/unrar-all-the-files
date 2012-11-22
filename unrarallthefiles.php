@@ -1,3 +1,4 @@
+#!/usr/bin/env php
 <?php
 // unrarallthefiles.php
 
@@ -278,7 +279,7 @@ class UnrarAllTheFiles {
 		if (!isset($optionList['t'])) {
 			// no - display usage
 			$this->writeLine(
-				'Usage: php ' . $argv[0] . ' -t[dir] -s[dir] -v --dry-run' . self::LE . self::LE .
+				'Usage: ' . basename($argv[0]) . ' -t[dir] -s[dir] -v --dry-run' . self::LE . self::LE .
 				'<Required>' . self::LE .
 				'  -t[dir]       Target directory for unrared files' . self::LE . self::LE .
 				'<Optional>' . self::LE .
