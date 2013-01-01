@@ -12,7 +12,7 @@ class UnrarAllTheFiles {
 
 
 
-	public function execute(array $argv) {
+	public function __construct(array $argv) {
 
 		// fetch command line options and validate given dirs - exit on error
 		if (
@@ -281,11 +281,11 @@ class UnrarAllTheFiles {
 			$this->writeLine(
 				'Usage: ' . basename($argv[0]) . ' -t[dir] -s[dir] -v --dry-run' . self::LE . self::LE .
 				'<Required>' . self::LE .
-				'  -t[dir]       Target directory for unrared files' . self::LE . self::LE .
+				'  -t[dir]      Target directory for unrared files' . self::LE . self::LE .
 				'<Optional>' . self::LE .
-				'  -s[dir]       Source directory to scan (current working directory if omitted)' . self::LE .
-				'  -v            Increase verbosity of unrar, otherwise silent operation' . self::LE .
-				'  --dry-run     Simulation of process, won\'t attempt to unrar archives' . self::LE
+				'  -s[dir]      Source directory to scan (current working directory if omitted)' . self::LE .
+				'  -v           Increase verbosity of unrar, otherwise silent operation' . self::LE .
+				'  --dry-run    Simulation of process, won\'t attempt to unrar archives' . self::LE
 			);
 
 			return false;
@@ -315,5 +315,4 @@ class UnrarAllTheFiles {
 }
 
 
-$unrarAllTheFiles = new UnrarAllTheFiles();
-$unrarAllTheFiles->execute($argv);
+new UnrarAllTheFiles($argv);
