@@ -29,9 +29,9 @@ Also shown by running `unrarallthefiles.php` without required command line optio
 	Usage: unrarallthefiles.php -t[dir] -s[dir] -v --dry-run
 
 	<Required>
-	  -t[dir]       Target directory for unrared files
+	  -t[dir]      Target directory for unrared files
 
 	<Optional>
-	  -s[dir]       Source directory to scan (current working directory if omitted)
-	  -v            Increase verbosity of unrar, otherwise silent operation
-	  --dry-run     Simulation of process, won't attempt to unrar archives
+	  -s[dir]      Source directory to scan (current working directory if omitted)
+	  -v           Increase verbosity of unrar, otherwise silent operation
+	  --dry-run    Simulation of process, won't attempt to unrar archives

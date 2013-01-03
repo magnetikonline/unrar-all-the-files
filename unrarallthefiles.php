@@ -253,7 +253,7 @@ class UnrarAllTheFiles {
 
 		// source dir
 		if (!is_dir($optionList['sourceDir'])) {
-			$this->writeLine('Invalid source dir - ' . $optionList['sourceDir'],true);
+			$this->writeLine('Invalid source directory - ' . $optionList['sourceDir'],true);
 			return false;
 		}
 
@@ -262,7 +262,7 @@ class UnrarAllTheFiles {
 		if ((!$optionList['dryRun']) && (!is_dir($targetDir))) {
 			// target dir does not exist, attempt to create it
 			if (!@mkdir($targetDir,0777,true)) {
-				$this->writeLine('Unable to create target dir - ' . $targetDir,true);
+				$this->writeLine('Unable to create target directory - ' . $targetDir,true);
 				return false;
 			}
 		}
