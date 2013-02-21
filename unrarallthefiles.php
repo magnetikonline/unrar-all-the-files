@@ -1,15 +1,10 @@
 #!/usr/bin/env php
 <?php
-// unrarallthefiles.php
-
-
-
 class UnrarAllTheFiles {
 
 	const LE = "\n";
 	const RAR_FILEEXT = '/\.(rar|r\d{2,3})$/';
 	const RAR_PART = '/\.part\d{1,3}$/i';
-
 
 
 	public function __construct(array $argv) {
@@ -79,9 +74,9 @@ class UnrarAllTheFiles {
 				list($rarFile,$errorCode) = $errorItem;
 				$this->writeLine($rarFile . ' => ' . $this->getUnrarErrorMessage($errorCode));
 			}
-
-			$this->writeLine();
 		}
+
+		$this->writeLine();
 	}
 
 	private function buildTargetExtractDir($targetDir,$targetDirSub,$singleRarFileSet) {

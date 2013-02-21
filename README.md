@@ -24,7 +24,7 @@ and...
 - Tested/used under Linux (Ubuntu) - but should be 100% with other *nix variants and OSX
 
 ## Usage
-Also shown by running `unrarallthefiles.php` without required command line option(s).
+Also shown by running `unrarallthefiles.php` without command line option(s).
 
 	Usage: unrarallthefiles.php -t[dir] -s[dir] -v --dry-run
 
