@@ -90,7 +90,7 @@ class UnrarAllTheFiles {
 
 		if (!is_dir($extractDir = $targetDir . $targetDirSub)) return $extractDir;
 
-		// ...extract dir does exist, keep adding digits to suffix until unique
+		// ...extract dir already exists, keep adding digits to suffix until unique
 		$retryCount = 1;
 		while (true) {
 			$extractDir = sprintf('%s%s-%02d',$targetDir,$targetDirSub,$retryCount);
