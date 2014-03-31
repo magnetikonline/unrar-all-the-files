@@ -219,7 +219,7 @@ class UnrarAllTheFiles {
 		if (!($groupedFileList = $this->getGroupedFileList($fileList))) return [$extractArchiveCount,$extractErrorList];
 
 		// if only a single rar file set found, dont extract into individual sub dirs
-		$singleRarFileSet = (sizeof($groupedFileList) == 1);
+		$singleRarFileSet = (count($groupedFileList) == 1);
 
 		// now work over grouped rar file list sets
 		foreach ($groupedFileList as $baseRarName => $rarFileSetList) {
