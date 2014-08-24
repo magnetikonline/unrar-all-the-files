@@ -273,14 +273,20 @@ class UnrarAllTheFiles {
 		// required options given?
 		if (!isset($optionList['t'])) {
 			// no - display usage
-			$this->writeLine(
-				'Usage: ' . basename($argv[0]) . ' -t[dir] -s[dir] -v --dry-run' . self::LE . self::LE .
-				'<Required>' . self::LE .
-				'  -t[dir]      Target directory for unrared files' . self::LE . self::LE .
-				'<Optional>' . self::LE .
-				'  -s[dir]      Source directory to scan (current working directory if omitted)' . self::LE .
-				'  -v           Increase verbosity of unrar, otherwise silent operation' . self::LE .
-				'  --dry-run    Simulation of process, won\'t attempt to unrar archives' . self::LE
+			$scriptName = basename($argv[0]);
+
+			$this->writeLine(<<<"EOT"
+Usage:
+  {$scriptName} -t DIR -s DIR -v --dry-run
+
+Required:
+  -t DIR     Target directory for unrared files
+
+Optional:
+  -s DIR     Source directory to scan (current working directory if omitted)
+  -v         Increase verbosity of unrar, otherwise silent operation
+  --dry-run  Simulation of process, won't attempt to unrar archives
+EOT
 			);
 
 			return false;

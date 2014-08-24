@@ -26,12 +26,13 @@ and...
 ## Usage
 Also shown by running `unrarallthefiles.php` without command line option(s).
 
-	Usage: unrarallthefiles.php -t[dir] -s[dir] -v --dry-run
+	Usage:
+	  unrarallthefiles.php -t DIR -s DIR -v --dry-run
 
-	<Required>
-	  -t[dir]      Target directory for unrared files
+	Required:
+	  -t DIR     Target directory for unrared files
 
-	<Optional>
-	  -s[dir]      Source directory to scan (current working directory if omitted)
-	  -v           Increase verbosity of unrar, otherwise silent operation
-	  --dry-run    Simulation of process, won't attempt to unrar archives
+	Optional:
+	  -s DIR     Source directory to scan (current working directory if omitted)
+	  -v         Increase verbosity of unrar, otherwise silent operation
+	  --dry-run  Simulation of process, won't attempt to unrar archives
