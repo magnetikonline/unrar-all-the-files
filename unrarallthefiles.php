@@ -7,7 +7,7 @@ class UnrarAllTheFiles {
 	const RAR_PART = '/\.part\d{1,3}$/i';
 
 
-	public function __construct(array $argv) {
+	public function execute(array $argv) {
 
 		// fetch command line options and validate given dirs - exit on error
 		if (
@@ -316,4 +316,4 @@ EOT
 }
 
 
-new UnrarAllTheFiles($argv);
+(new UnrarAllTheFiles())->execute($argv);
